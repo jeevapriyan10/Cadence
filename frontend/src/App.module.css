@@ -1,0 +1,422 @@
+.appContainer {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #0a0d14;
+  color: #f0f4fc;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* Header */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background-color: #0e131d;
+  border-bottom: 1px solid #1a2233;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.brandGroup {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.brandLogo {
+  width: 32px;
+  height: 32px;
+  color: #38bdf8;
+}
+
+.titleGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.titleBadge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tagline {
+  font-size: 0.8125rem;
+  color: #94a3b8;
+  font-style: italic;
+  margin-top: 0.15rem;
+}
+
+.systemStatus {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #64748b;
+  background-color: #121723;
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+  border: 1px solid #1e2638;
+}
+
+.statusIndicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #10b981;
+  box-shadow: 0 0 8px #10b981;
+}
+
+/* Control Panel */
+.controlPanel {
+  background-color: #0f1420;
+  border-bottom: 1px solid #1a2233;
+  padding: 1rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+}
+
+.controlsGroup {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.controlField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.fieldLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.selectInput,
+.numberInput {
+  background-color: #141a29;
+  border: 1px solid #232d42;
+  color: #f1f5f9;
+  padding: 0.55rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.selectInput:focus,
+.numberInput:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
+}
+
+.seedInputGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.numberInput {
+  width: 120px;
+}
+
+.iconButton {
+  background-color: #1a2233;
+  border: 1px solid #28354d;
+  color: #94a3b8;
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.iconButton:hover:not(:disabled) {
+  background-color: #232d42;
+  color: #38bdf8;
+  border-color: #38bdf8;
+}
+
+.iconButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.actionsGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.primaryButton {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  color: #ffffff;
+  border: 1px solid #38bdf8;
+  padding: 0.6rem 1.25rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+  box-shadow: 0 2px 8px rgba(2, 132, 199, 0.35);
+}
+
+.primaryButton:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.5);
+}
+
+.solveButton {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: #ffffff;
+  border: 1px solid #34d399;
+  padding: 0.6rem 1.25rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+  box-shadow: 0 2px 8px rgba(5, 150, 105, 0.35);
+}
+
+.solveButton:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.5);
+}
+
+.primaryButton:disabled,
+.solveButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Error Banner */
+.errorBanner {
+  margin: 1rem 2rem 0;
+  background-color: rgba(220, 38, 38, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 8px;
+  padding: 0.875rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  color: #fca5a5;
+  font-size: 0.875rem;
+}
+
+.errorContent {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.errorIcon {
+  width: 20px;
+  height: 20px;
+  color: #ef4444;
+  flex-shrink: 0;
+}
+
+.dismissErrorButton {
+  background: none;
+  border: none;
+  color: #fca5a5;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0.25rem;
+  border-radius: 4px;
+}
+
+.dismissErrorButton:hover {
+  color: #ffffff;
+  background-color: rgba(239, 68, 68, 0.2);
+}
+
+/* Metadata / Run Details Bar */
+.runMetadataBar {
+  margin: 1rem 2rem 0;
+  background-color: #0f1420;
+  border: 1px solid #1a2233;
+  border-radius: 8px;
+  padding: 0.75rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  font-size: 0.8125rem;
+  color: #94a3b8;
+}
+
+.metaItem {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.metaLabel {
+  color: #64748b;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.metaValue {
+  color: #f1f5f9;
+  font-weight: 600;
+}
+
+.metaCode {
+  background-color: #141a29;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #232d42;
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: #38bdf8;
+}
+
+.statusOptimal {
+  color: #34d399;
+}
+
+.statusFeasible {
+  color: #38bdf8;
+}
+
+.statusInfeasible {
+  color: #f87171;
+}
+
+/* Main Dashboard Area */
+.mainContent {
+  flex: 1;
+  padding: 1rem 2rem 2rem;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Empty State */
+.dashboardEmptyState {
+  flex: 1;
+  min-height: 440px;
+  background-color: #0d111a;
+  border: 1px dashed #1e293b;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 3rem 2rem;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.emptyGraphic {
+  width: 56px;
+  height: 56px;
+  color: #334155;
+}
+
+.emptyStateTitle {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.emptyStateMessage {
+  font-size: 0.9rem;
+  color: #64748b;
+  max-width: 480px;
+  line-height: 1.6;
+}
+
+.stepHint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background-color: #121723;
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+  border: 1px solid #1e2638;
+  font-size: 0.775rem;
+  color: #38bdf8;
+  margin-top: 0.5rem;
+}
+
+/* Footer */
+.footer {
+  background-color: #090c13;
+  border-top: 1px solid #161e2e;
+  padding: 0.875rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  color: #475569;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.footer strong {
+  color: #94a3b8;
+}
+
+/* Inline Spinner */
+.buttonSpinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
