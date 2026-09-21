@@ -338,6 +338,34 @@
   flex-direction: column;
 }
 
+.dashboardLayout {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 1.25rem;
+  flex: 1;
+  min-height: 520px;
+  margin-top: 1rem;
+}
+
+@media (max-width: 1200px) {
+  .dashboardLayout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ganttArea {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.rippleArea {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 /* Empty State */
 .dashboardEmptyState {
   flex: 1;

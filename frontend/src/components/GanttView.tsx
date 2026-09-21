@@ -10,6 +10,7 @@ export interface GanttViewProps {
   sections?: TrackSection[]
   tasks?: MaintenanceTask[]
   isLoading?: boolean
+  onItemClick?: (taskId: string) => void
   onSelectTask?: (taskId: string) => void
 }
 
@@ -35,6 +36,7 @@ export const GanttView: React.FC<GanttViewProps> = ({
   sections = [],
   tasks = [],
   isLoading = false,
+  onItemClick,
   onSelectTask,
 }) => {
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -153,10 +155,9 @@ export const GanttView: React.FC<GanttViewProps> = ({
         const selectedId = String(properties.items[0])
         const block = scheduledBlocks.find((b) => b.id === selectedId)
         if (block) {
-          // Log task_id to console per requirements
-          console.log(`[Cadence Gantt] Selected task_id: ${block.task_id}`)
-          // TODO: Module 10 will wire this to the explanation panel
-          if (onSelectTask) {
+          if (onItemClick) {
+            onItemClick(block.task_id)
+          } else if (onSelectTask) {
             onSelectTask(block.task_id)
           }
         }
@@ -169,7 +170,7 @@ export const GanttView: React.FC<GanttViewProps> = ({
         timelineRef.current = null
       }
     }
-  }, [scheduledBlocks, sections, tasks, isLoading, onSelectTask])
+  }, [scheduledBlocks, sections, tasks, isLoading, onItemClick, onSelectTask])
 
   if (isLoading) {
     return (
