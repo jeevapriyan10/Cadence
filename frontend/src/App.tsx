@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useCallback, useState } from 'react'
 import {
   generateNetwork as apiGenerateNetwork,
   getNetwork as apiGetNetwork,
@@ -10,7 +10,9 @@ import type {
   ProfileName,
   SolveResponse,
 } from './api/types'
+import { ExplanationPanel } from './components/ExplanationPanel'
 import { GanttView } from './components/GanttView'
+import { RipplePanel } from './components/RipplePanel'
 import styles from './App.module.css'
 
 function getRandomSeed(): number {
@@ -28,6 +30,10 @@ export const App: React.FC = () => {
   const [networkDetails, setNetworkDetails] = useState<NetworkDetailsResponse | null>(null)
   const [solveResult, setSolveResult] = useState<SolveResponse | null>(null)
 
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+  const [isExplanationOpen, setIsExplanationOpen] = useState<boolean>(false)
+  const [solveTimestamp, setSolveTimestamp] = useState<number>(0)
+
   const handleRollSeed = () => {
     setSeed(getRandomSeed())
   }
@@ -36,6 +42,9 @@ export const App: React.FC = () => {
     setIsGenerating(true)
     setErrorMessage(null)
     setSolveResult(null)
+    setSelectedTaskId(null)
+    setIsExplanationOpen(false)
+    setSolveTimestamp(0)
 
     try {
       const genResponse = await apiGenerateNetwork({
@@ -73,6 +82,7 @@ export const App: React.FC = () => {
         run_id: activeRun.run_id,
       })
       setSolveResult(result)
+      setSolveTimestamp(Date.now())
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       setErrorMessage(msg)
@@ -80,6 +90,11 @@ export const App: React.FC = () => {
       setIsSolving(false)
     }
   }
+
+  const handleItemClick = useCallback((taskId: string) => {
+    setSelectedTaskId(taskId)
+    setIsExplanationOpen(true)
+  }, [])
 
   const isBusy = isGenerating || isSolving
 
@@ -292,13 +307,53 @@ export const App: React.FC = () => {
 
       {/* Main Content Area */}
       <main className={styles.mainContent}>
-        {solveResult ? (
-          <GanttView
-            scheduledBlocks={solveResult.scheduled_blocks}
-            sections={networkDetails?.sections}
-            tasks={networkDetails?.maintenance_tasks}
-            isLoading={isSolving}
-          />
+        {activeRun ? (
+          <div className={styles.dashboardLayout}>
+            <div className={styles.ganttArea}>
+              {solveResult ? (
+                <GanttView
+                  scheduledBlocks={solveResult.scheduled_blocks}
+                  sections={networkDetails?.sections}
+                  tasks={networkDetails?.maintenance_tasks}
+                  isLoading={isSolving}
+                  onItemClick={handleItemClick}
+                />
+              ) : (
+                <div className={styles.dashboardEmptyState}>
+                  <svg
+                    className={styles.emptyGraphic}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                    <line x1="8" y1="21" x2="16" y2="21" />
+                    <line x1="12" y1="17" x2="12" y2="21" />
+                  </svg>
+                  <div className={styles.emptyStateTitle}>Network Ready for Solver</div>
+                  <p className={styles.emptyStateMessage}>
+                    Synthetic network '{activeRun.profile_name}' generated with{' '}
+                    {activeRun.section_count} sections and {activeRun.task_count} tasks. Click 'Solve
+                    Schedule' to compute optimal, conflict-free possession blocks with Google
+                    OR-Tools CP-SAT.
+                  </p>
+                  <div className={styles.stepHint}>Step 2 of 2: Run CP-SAT Solver</div>
+                </div>
+              )}
+            </div>
+
+            <aside className={styles.rippleArea} aria-label="Delay Cascade Impact Analysis">
+              <RipplePanel
+                runId={activeRun.run_id}
+                isSolved={Boolean(solveResult)}
+                solveTimestamp={solveTimestamp}
+                isLoading={isSolving}
+              />
+            </aside>
+          </div>
         ) : (
           <div className={styles.dashboardEmptyState}>
             <svg
@@ -314,20 +369,25 @@ export const App: React.FC = () => {
               <line x1="8" y1="21" x2="16" y2="21" />
               <line x1="12" y1="17" x2="12" y2="21" />
             </svg>
-            <div className={styles.emptyStateTitle}>
-              {activeRun ? 'Network Ready for Solver' : 'No Active Railway Schedule'}
-            </div>
+            <div className={styles.emptyStateTitle}>No Active Railway Schedule</div>
             <p className={styles.emptyStateMessage}>
-              {activeRun
-                ? `Synthetic network '${activeRun.profile_name}' generated with ${activeRun.section_count} sections and ${activeRun.task_count} tasks. Click 'Solve Schedule' to compute optimal, conflict-free possession blocks with Google OR-Tools CP-SAT.`
-                : "Select a network profile and random seed above, then click 'Generate Network' to generate topology, timetable slots, and possession maintenance tasks."}
+              Select a network profile and random seed above, then click 'Generate Network' to
+              generate topology, timetable slots, and possession maintenance tasks.
             </p>
-            <div className={styles.stepHint}>
-              {activeRun ? 'Step 2 of 2: Run CP-SAT Solver' : 'Step 1 of 2: Generate Network'}
-            </div>
+            <div className={styles.stepHint}>Step 1 of 2: Generate Network</div>
           </div>
         )}
       </main>
+
+      {/* Explanation Modal / Side Drawer */}
+      {activeRun && (
+        <ExplanationPanel
+          runId={activeRun.run_id}
+          taskId={selectedTaskId}
+          isOpen={isExplanationOpen}
+          onClose={() => setIsExplanationOpen(false)}
+        />
+      )}
 
       {/* Footer */}
       <footer className={styles.footer}>
