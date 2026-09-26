@@ -32,6 +32,10 @@ htmlcov/
 *.db
 *.sqlite3
 
+# Flux RL models
+backend/cadence/flux/models/*.zip
+!backend/cadence/flux/models/.gitkeep
+
 # Node
 node_modules/
 dist/

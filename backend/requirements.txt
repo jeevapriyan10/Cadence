@@ -8,3 +8,4 @@ networkx
 pytest
 httpx2
 gymnasium
+stable-baselines3

@@ -9,12 +9,13 @@ from cadence.solve.replan import (
     replan_full_resolve,
     replan_warm_start,
 )
-from cadence.solve.safety import precompute_unsafe_adjacency_pairs
+from cadence.solve.safety import count_safety_violations, precompute_unsafe_adjacency_pairs
 from cadence.solve.solver import SolveResult, solve_schedule
 
 __all__ = [
     "build_cp_model",
     "precompute_unsafe_adjacency_pairs",
+    "count_safety_violations",
     "solve_schedule",
     "SolveResult",
     "ReplanResult",
