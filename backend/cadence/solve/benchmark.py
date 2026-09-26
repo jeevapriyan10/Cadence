@@ -18,6 +18,30 @@ from cadence.solve.solver import SolveResult
 # Handler type for replan strategies to support future extension (e.g. Module 13 'rl')
 ReplanStrategyHandler = Callable[..., ReplanResult]
 
+def _default_rl_handler(**kwargs: Any) -> ReplanResult:
+    from cadence.flux.policy_replan import replan_rl
+
+    model_path = kwargs.get("rl_model_path") or kwargs.get("model_path")
+    if not model_path:
+        raise ValueError("replan_rl requires 'rl_model_path' or 'model_path' parameter.")
+    return replan_rl(
+        model_path=model_path,
+        previous_solve_result=kwargs["previous_solve_result"],
+        new_emergency_task=kwargs["new_emergency_task"],
+        all_existing_tasks=kwargs["all_existing_tasks"],
+        sections=kwargs["sections"],
+        train_slots=kwargs["train_slots"],
+        profile=kwargs["profile"],
+        unsafe_adjacency_pairs=kwargs["unsafe_adjacency_pairs"],
+        time_horizon_minutes=kwargs.get("time_horizon_minutes", 1440),
+        base_time=kwargs.get("base_time"),
+        graph=kwargs.get("graph"),
+        adjacencies=kwargs.get("adjacencies"),
+        previous_model_context=kwargs.get("previous_model_context"),
+        time_limit_seconds=kwargs.get("time_limit_seconds", 30),
+    )
+
+
 _REPLAN_STRATEGY_REGISTRY: dict[str, ReplanStrategyHandler] = {
     "full_resolve": lambda **kwargs: replan_full_resolve(
         previous_solve_result=kwargs["previous_solve_result"],
@@ -46,6 +70,7 @@ _REPLAN_STRATEGY_REGISTRY: dict[str, ReplanStrategyHandler] = {
         graph=kwargs.get("graph"),
         adjacencies=kwargs.get("adjacencies"),
     ),
+    "rl": _default_rl_handler,
 }
 
 
@@ -68,6 +93,7 @@ def run_replan_benchmark(
     graph: Optional[NetworkGraph] = None,
     adjacencies: Optional[list[Union[SectionAdjacencySchema, SectionAdjacency]]] = None,
     strategies: Optional[list[str]] = None,
+    rl_model_path: Optional[str] = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Run dynamic re-planning benchmark comparing strategies on an identical scenario.
@@ -76,14 +102,14 @@ def run_replan_benchmark(
     as 'rl' in Module 13), computing speedup factor and signed objective delta.
 
     Objective Delta Sign Convention:
-        objective_delta = warm_start.objective_value - full_resolve.objective_value
-        - Negative (< 0): warm_start achieved a lower penalty (better solution quality).
+        objective_delta = candidate.objective_value - full_resolve.objective_value
+        - Negative (< 0): candidate achieved a lower penalty (better solution quality).
         - Positive (> 0): full_resolve achieved a lower penalty (better solution quality).
         - Zero (0.0): identical objective quality.
 
     Speedup Factor:
-        speedup_factor = full_resolve.wall_time_seconds / warm_start.wall_time_seconds
-        - Value > 1.0 indicates warm_start solved faster than full_resolve.
+        speedup_factor = full_resolve.wall_time_seconds / candidate.wall_time_seconds
+        - Value > 1.0 indicates candidate solved faster than full_resolve.
 
     Args:
         previous_solve_result: The prior SolveResult before emergency task insertion.
@@ -99,17 +125,48 @@ def run_replan_benchmark(
         graph: Optional NetworkGraph representation of topology.
         adjacencies: Optional list of SectionAdjacency connections.
         strategies: Optional list of strategy names to run (defaults to ['full_resolve', 'warm_start']).
+        rl_model_path: Optional path to saved SB3 PPO model. When provided, automatically
+            runs 'rl' strategy and surfaces results in comparison dict.
         **kwargs: Additional parameters passed to strategy handlers.
 
     Returns:
         dict[str, Any]: Comparison dictionary structured for clean extension:
             - 'full_resolve': ReplanResult
             - 'warm_start': ReplanResult
-            - 'speedup_factor': float
-            - 'objective_delta': float | None
+            - 'rl': ReplanResult (when rl_model_path or 'rl' strategy requested)
+            - 'speedup_factor': float (warm_start vs full_resolve baseline)
+            - 'objective_delta': float | None (warm_start vs full_resolve baseline)
+            - 'rl_speedup_factor': float (when 'rl' present)
+            - 'rl_objective_delta': float | None (when 'rl' present)
+            - 'rl_fallback_triggered': bool (when 'rl' present)
             - 'strategies': dict[str, ReplanResult] mapping strategy names to their results
             - 'comparisons': dict[str, dict[str, Any]] comparison metrics against baseline
     """
+    target_strategies = list(strategies) if strategies is not None else ["full_resolve", "warm_start"]
+    if rl_model_path is not None and "rl" not in target_strategies:
+        target_strategies.append("rl")
+
+    # Resolve unsafe_adjacency_pairs if needed for strategies like 'rl'
+    unsafe_pairs = kwargs.get("unsafe_adjacency_pairs")
+    if unsafe_pairs is None and ("rl" in target_strategies):
+        if previous_model_context and "unsafe_adjacency_pairs" in previous_model_context:
+            unsafe_pairs = previous_model_context["unsafe_adjacency_pairs"]
+        else:
+            net_graph = graph
+            if net_graph is None and adjacencies is not None:
+                net_graph = NetworkGraph.build_from_sections(sections, adjacencies)
+            if net_graph is not None:
+                from cadence.solve.safety import precompute_unsafe_adjacency_pairs
+
+                unsafe_pairs = precompute_unsafe_adjacency_pairs(
+                    graph=net_graph,
+                    profile=profile,
+                    sections=sections,
+                    train_slots=train_slots,
+                )
+            else:
+                unsafe_pairs = []
+
     call_kwargs = {
         "previous_solve_result": previous_solve_result,
         "previous_model_context": previous_model_context,
@@ -123,10 +180,12 @@ def run_replan_benchmark(
         "base_time": base_time,
         "graph": graph,
         "adjacencies": adjacencies,
+        "unsafe_adjacency_pairs": unsafe_pairs or [],
+        "rl_model_path": rl_model_path,
+        "model_path": rl_model_path,
         **kwargs,
     }
 
-    target_strategies = strategies or ["full_resolve", "warm_start"]
     results: dict[str, ReplanResult] = {}
 
     for strat in target_strategies:
@@ -136,6 +195,29 @@ def run_replan_benchmark(
             results[strat] = replan_full_resolve(**call_kwargs)
         elif strat == "warm_start":
             results[strat] = replan_warm_start(**call_kwargs)
+        elif strat == "rl":
+            from cadence.flux.policy_replan import replan_rl
+
+            m_path = rl_model_path or kwargs.get("model_path")
+            if not m_path:
+                raise ValueError("replan_rl requires 'rl_model_path' or 'model_path' parameter.")
+            results[strat] = replan_rl(
+                model_path=m_path,
+                previous_solve_result=previous_solve_result,
+                new_emergency_task=new_emergency_task,
+                all_existing_tasks=all_existing_tasks,
+                sections=sections,
+                train_slots=train_slots,
+                profile=profile,
+                unsafe_adjacency_pairs=unsafe_pairs,
+                time_horizon_minutes=time_horizon_minutes,
+                base_time=base_time,
+                graph=graph,
+                adjacencies=adjacencies,
+                previous_model_context=previous_model_context,
+                time_limit_seconds=time_limit_seconds,
+                **kwargs,
+            )
         else:
             raise ValueError(f"Unknown replan strategy: {strat}")
 
@@ -182,9 +264,10 @@ def run_replan_benchmark(
             "wall_time_seconds": strat_res.wall_time_seconds,
             "objective_value": strat_res.objective_value,
             "tasks_changed_count": len(strat_res.tasks_changed),
+            "rl_fallback_triggered": getattr(strat_res, "rl_fallback_triggered", False),
         }
 
-    return {
+    ret: dict[str, Any] = {
         "full_resolve": full_res,
         "warm_start": warm_res,
         "speedup_factor": speedup_factor,
@@ -192,3 +275,19 @@ def run_replan_benchmark(
         "strategies": results,
         "comparisons": comparisons,
     }
+
+    if "rl" in results:
+        rl_res = results["rl"]
+        ret["rl"] = rl_res
+        ret["rl_fallback_triggered"] = getattr(rl_res, "rl_fallback_triggered", False)
+        if full_res is not None:
+            rl_speedup = float(full_wall_time / max(1e-6, rl_res.wall_time_seconds))
+            rl_delta = (
+                float(rl_res.objective_value - full_res.objective_value)
+                if (rl_res.objective_value is not None and full_res.objective_value is not None)
+                else None
+            )
+            ret["rl_speedup_factor"] = rl_speedup
+            ret["rl_objective_delta"] = rl_delta
+
+    return ret

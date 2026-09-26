@@ -27,9 +27,10 @@ class ReplanStrategy(str, Enum):
 
     FULL_RESOLVE = "full_resolve"
     WARM_START = "warm_start"
+    RL = "rl"
 
 
-ReplanStrategyType = Literal["full_resolve", "warm_start"]
+ReplanStrategyType = Literal["full_resolve", "warm_start", "rl"]
 
 
 class ReplanResult(BaseModel):
@@ -42,6 +43,7 @@ class ReplanResult(BaseModel):
     wall_time_seconds: float = 0.0
     previous_objective_value: Optional[float] = None
     tasks_changed: list[str] = Field(default_factory=list)
+    rl_fallback_triggered: bool = False
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
