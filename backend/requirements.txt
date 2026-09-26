@@ -7,3 +7,4 @@ ortools
 networkx
 pytest
 httpx2
+gymnasium

@@ -19,6 +19,7 @@ dependencies = [
     "alembic",
     "ortools",
     "networkx",
+    "gymnasium",
 ]
 
 [project.optional-dependencies]
