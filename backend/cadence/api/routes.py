@@ -9,18 +9,24 @@ from cadence.api.schemas import (
     ExplainResponse,
     GenerateNetworkResponse,
     GenerateNetworkRequest,
+    HistoryResponseSchema,
+    ReplanRequestSchema,
+    ReplanResponseSchema,
     RippleResponse,
     SolveRequest,
     SolveResponse,
 )
 from cadence.api.store import run_store
+from cadence.domain.db import get_session
 from cadence.domain.graph import NetworkGraph
 from cadence.domain.schemas import (
     MaintenanceTaskSchema,
+    ScheduledBlockSchema,
     SectionAdjacencySchema,
     TrackSectionSchema,
     TrainSlotSchema,
 )
+from cadence.echo.store import echo_store
 from cadence.generator import generate_synthetic_network
 from cadence.profiles.registry import ProfileRegistry
 from cadence.reason import (
@@ -30,7 +36,13 @@ from cadence.reason import (
     format_explanation,
 )
 from cadence.ripple import format_report_summary, simulate_cascade
-from cadence.solve import build_cp_model, solve_schedule
+from cadence.solve import (
+    SolveResult,
+    build_cp_model,
+    replan_full_resolve,
+    replan_warm_start,
+    solve_schedule,
+)
 
 router = APIRouter()
 
@@ -80,7 +92,18 @@ async def generate_network(request: GenerateNetworkRequest) -> GenerateNetworkRe
             detail=f"Network generation failed: {exc}",
         ) from exc
 
-    run_id = run_store.create_run(network_data=net)
+    with get_session() as session:
+        net_run = echo_store.record_network_run(
+            session=session,
+            profile_name=net["profile_name"],
+            seed=net["seed"],
+            section_count=len(net["sections"]),
+            train_count=len(net["train_slots"]),
+            task_count=len(net["maintenance_tasks"]),
+        )
+        run_id = net_run.id
+
+    run_store.set_network_cache(run_id, net)
 
     return GenerateNetworkResponse(
         run_id=run_id,
@@ -192,6 +215,15 @@ async def solve(request: SolveRequest) -> SolveResponse:
         time_horizon_minutes=request.time_horizon_minutes,
         adjacencies=net["adjacencies"],
     )
+
+    with get_session() as session:
+        echo_store.record_decision(
+            session=session,
+            network_run_id=request.run_id,
+            strategy="full_resolve",
+            solve_or_replan_result=solve_result,
+            is_replan=False,
+        )
 
     run_store.update_run(
         request.run_id,
@@ -370,3 +402,203 @@ async def get_full_schedule_explanation(run_id: str) -> ExplainAllResponse:
         run_id=run_id,
         explanations=items,
     )
+
+
+@router.post(
+    "/replan",
+    response_model=ReplanResponseSchema,
+    summary="Dynamic Re-planning for Emergency Task",
+    tags=["Solve"],
+    responses={
+        400: {"model": ErrorResponse, "description": "Invalid replan strategy or missing prior solve"},
+        404: {"model": ErrorResponse, "description": "Run ID not found"},
+    },
+)
+async def replan(request: ReplanRequestSchema) -> ReplanResponseSchema:
+    """Execute dynamic re-planning to integrate an emergency maintenance task.
+
+    Fetches the latest decision via get_latest_decision, invokes the selected strategy
+    ('full_resolve', 'warm_start', or 'rl'), persists the new schedule decision record
+    with is_replan=True, and returns the replanned outcome.
+    """
+    run_data = run_store.get_run(request.run_id)
+    if run_data is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Run '{request.run_id}' not found.",
+        )
+
+    net = run_data.get("network")
+    if net is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Run '{request.run_id}' has no stored network. Generate a network first.",
+        )
+
+    with get_session() as session:
+        latest_decision = echo_store.get_latest_decision(session, request.run_id)
+        if latest_decision is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"No prior decision found for run '{request.run_id}'. Run /solve first.",
+            )
+        prev_status = latest_decision.status
+        prev_blocks = [
+            ScheduledBlockSchema.model_validate(b)
+            for b in latest_decision.scheduled_blocks_snapshot
+        ]
+        prev_obj = latest_decision.objective_value
+        prev_wall_time = latest_decision.wall_time_seconds
+
+    profile = ProfileRegistry.get(net["profile_name"])
+
+    # Reconstruct prior solve result from latest decision
+    prev_solve = SolveResult(
+        status=prev_status,
+        scheduled_blocks=prev_blocks,
+        objective_value=prev_obj,
+        wall_time_seconds=prev_wall_time,
+    )
+
+    strat = request.strategy.lower()
+    if strat == "full_resolve":
+        replan_res = replan_full_resolve(
+            previous_solve_result=prev_solve,
+            new_emergency_task=request.new_emergency_task,
+            all_existing_tasks=net["maintenance_tasks"],
+            sections=net["sections"],
+            train_slots=net["train_slots"],
+            profile=profile,
+            time_horizon_minutes=request.time_horizon_minutes,
+            time_limit_seconds=request.time_limit_seconds,
+            adjacencies=net["adjacencies"],
+        )
+    elif strat == "warm_start":
+        model_context = run_data.get("model_context")
+        if model_context is None:
+            model_context = build_cp_model(
+                sections=net["sections"],
+                tasks=net["maintenance_tasks"],
+                train_slots=net["train_slots"],
+                profile=profile,
+                time_horizon_minutes=request.time_horizon_minutes,
+                adjacencies=net["adjacencies"],
+            )
+        replan_res = replan_warm_start(
+            previous_solve_result=prev_solve,
+            previous_model_context=model_context,
+            new_emergency_task=request.new_emergency_task,
+            all_existing_tasks=net["maintenance_tasks"],
+            sections=net["sections"],
+            train_slots=net["train_slots"],
+            profile=profile,
+            time_horizon_minutes=request.time_horizon_minutes,
+            time_limit_seconds=request.time_limit_seconds,
+            adjacencies=net["adjacencies"],
+        )
+    elif strat == "rl":
+        if not request.model_path:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Strategy 'rl' requires 'model_path' parameter in request body.",
+            )
+        from cadence.flux.policy_replan import replan_rl
+        from cadence.solve.safety import precompute_unsafe_adjacency_pairs
+
+        unsafe_pairs = precompute_unsafe_adjacency_pairs(
+            sections=net["sections"],
+            adjacencies=net["adjacencies"],
+            profile=profile,
+        )
+        replan_res = replan_rl(
+            model_path=request.model_path,
+            previous_solve_result=prev_solve,
+            new_emergency_task=request.new_emergency_task,
+            all_existing_tasks=net["maintenance_tasks"],
+            sections=net["sections"],
+            train_slots=net["train_slots"],
+            profile=profile,
+            unsafe_adjacency_pairs=unsafe_pairs,
+            time_horizon_minutes=request.time_horizon_minutes,
+            time_limit_seconds=request.time_limit_seconds,
+            candidate_slots=request.candidate_slots,
+            adjacencies=net["adjacencies"],
+            previous_model_context=run_data.get("model_context"),
+        )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown replan strategy '{request.strategy}'. Supported: 'full_resolve', 'warm_start', 'rl'",
+        )
+
+    # Persist decision via record_decision(is_replan=True)
+    with get_session() as session:
+        echo_store.record_decision(
+            session=session,
+            network_run_id=request.run_id,
+            strategy=replan_res.strategy,
+            solve_or_replan_result=replan_res,
+            is_replan=True,
+        )
+
+    # Append emergency task to net's maintenance_tasks and update store cache
+    em_id = request.new_emergency_task.id
+    updated_tasks = [t for t in net["maintenance_tasks"] if (t.id if hasattr(t, "id") else t["id"]) != em_id]
+    updated_tasks.append(request.new_emergency_task)
+    net["maintenance_tasks"] = updated_tasks
+
+    run_store.update_run(
+        request.run_id,
+        solve_result=replan_res,
+        network=net,
+    )
+
+    blocks_json = [b.model_dump(mode="json") for b in replan_res.scheduled_blocks]
+
+    return ReplanResponseSchema(
+        strategy=replan_res.strategy,
+        status=replan_res.status,
+        scheduled_blocks=blocks_json,
+        objective_value=replan_res.objective_value,
+        wall_time_seconds=replan_res.wall_time_seconds,
+        previous_objective_value=replan_res.previous_objective_value,
+        tasks_changed=replan_res.tasks_changed,
+        rl_fallback_triggered=replan_res.rl_fallback_triggered,
+    )
+
+
+@router.get(
+    "/history/{run_id}",
+    response_model=list[HistoryResponseSchema],
+    summary="Get Run Decision History",
+    tags=["History"],
+    responses={
+        404: {"model": ErrorResponse, "description": "Run ID not found"},
+    },
+)
+async def get_history(run_id: str) -> list[HistoryResponseSchema]:
+    """Retrieve full chronological decision history for a railway network run."""
+    run_data = run_store.get_run(run_id)
+    if run_data is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Run '{run_id}' not found.",
+        )
+
+    with get_session() as session:
+        history_records = echo_store.get_run_history(session, run_id)
+        history_list = [
+            HistoryResponseSchema(
+                strategy=rec.strategy,
+                status=rec.status,
+                objective_value=rec.objective_value,
+                wall_time_seconds=rec.wall_time_seconds,
+                is_replan=rec.is_replan,
+                created_at=rec.created_at,
+                rl_fallback_triggered=rec.rl_fallback_triggered,
+            )
+            for rec in history_records
+        ]
+
+    return history_list
+

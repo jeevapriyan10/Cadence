@@ -13,7 +13,9 @@ from cadence.domain.db import (
 from cadence.domain.graph import NetworkGraph
 from cadence.domain.models import (
     Base,
+    DecisionRecord,
     MaintenanceTask,
+    NetworkRun,
     ScheduledBlock,
     SectionAdjacency,
     TrackSection,
@@ -34,6 +36,8 @@ __all__ = [
     "TrainSlot",
     "MaintenanceTask",
     "ScheduledBlock",
+    "NetworkRun",
+    "DecisionRecord",
     "TrackSectionSchema",
     "SectionAdjacencySchema",
     "TrainSlotSchema",

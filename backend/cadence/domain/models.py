@@ -143,3 +143,58 @@ class ScheduledBlock(Base):
 
     def __repr__(self) -> str:
         return f"<ScheduledBlock(id='{self.id}', task_id='{self.task_id}', method='{self.method}')>"
+
+
+class NetworkRun(Base):
+    """Represents a generated railway network instance."""
+
+    __tablename__ = "network_runs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=generate_uuid)
+    profile_name: Mapped[str] = mapped_column(String, nullable=False)
+    seed: Mapped[int] = mapped_column(Integer, nullable=False)
+    section_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    train_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    task_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+
+    decisions: Mapped[list["DecisionRecord"]] = relationship(
+        "DecisionRecord",
+        back_populates="network_run",
+        cascade="all, delete-orphan",
+        order_by="DecisionRecord.created_at",
+    )
+
+    def __repr__(self) -> str:
+        return f"<NetworkRun(id='{self.id}', profile='{self.profile_name}', seed={self.seed})>"
+
+
+class DecisionRecord(Base):
+    """Represents a persisted solve or replan decision for a railway network run."""
+
+    __tablename__ = "decision_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    network_run_id: Mapped[str] = mapped_column(
+        String,
+        ForeignKey("network_runs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    strategy: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    objective_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    wall_time_seconds: Mapped[float] = mapped_column(Float, nullable=False)
+    rl_fallback_triggered: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    scheduled_blocks_snapshot: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
+    is_replan: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+
+    network_run: Mapped["NetworkRun"] = relationship(
+        "NetworkRun",
+        back_populates="decisions",
+    )
+
+    def __repr__(self) -> str:
+        return f"<DecisionRecord(id={self.id}, run_id='{self.network_run_id}', strategy='{self.strategy}', is_replan={self.is_replan})>"
+
