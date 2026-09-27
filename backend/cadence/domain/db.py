@@ -24,7 +24,7 @@ def get_engine(url: Optional[str] = None) -> Engine:
 
 
 engine = get_engine()
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, expire_on_commit=False, bind=engine)
 
 
 @contextmanager
