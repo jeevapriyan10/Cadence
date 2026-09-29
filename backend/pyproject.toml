@@ -37,4 +37,5 @@ testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_functions = ["test_*"]
 pythonpath = ["."]
+addopts = "--cov=cadence --cov-report=term-missing --cov-fail-under=90"
 

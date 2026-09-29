@@ -250,10 +250,10 @@ def explain_task_scheduling(
             rejected_candidates=[],
         )
 
-    # Resolve unsafe adjacency pairs
+    # Resolve unsafe adjacency pairs (solve_result can be SolveResult or ReplanResult)
     unsafe_pairs = (
         model_context.get("unsafe_adjacency_pairs")
-        or solve_result.unsafe_adjacency_pairs
+        or getattr(solve_result, "unsafe_adjacency_pairs", None)
         or []
     )
     if not unsafe_pairs:
