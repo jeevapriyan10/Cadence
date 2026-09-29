@@ -502,13 +502,17 @@ async def replan(request: ReplanRequestSchema) -> ReplanResponseSchema:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Strategy 'rl' requires 'model_path' parameter in request body.",
             )
+        from cadence.domain.graph import NetworkGraph
         from cadence.flux.policy_replan import replan_rl
         from cadence.solve.safety import precompute_unsafe_adjacency_pairs
 
+        # Precompute unsafe adjacency pairs using the network graph
+        net_graph = NetworkGraph.build_from_sections(net["sections"], net.get("adjacencies", []))
         unsafe_pairs = precompute_unsafe_adjacency_pairs(
-            sections=net["sections"],
-            adjacencies=net["adjacencies"],
+            graph=net_graph,
             profile=profile,
+            sections=net["sections"],
+            train_slots=net.get("train_slots", []),
         )
         replan_res = replan_rl(
             model_path=request.model_path,

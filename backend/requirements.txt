@@ -6,6 +6,7 @@ alembic
 ortools
 networkx
 pytest
+pytest-cov
 httpx2
 gymnasium
 stable-baselines3
