@@ -18,13 +18,25 @@ if config.config_file_name is not None:
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from cadence.domain.models import Base
-from cadence.domain.db import DATABASE_URL
+from cadence.domain.db import DATABASE_URL, DEFAULT_DATABASE_URL
 
 target_metadata = Base.metadata
 
 
 def get_url() -> str:
-    return os.getenv("DATABASE_URL", DATABASE_URL)
+    url = os.getenv("DATABASE_URL") or DATABASE_URL or DEFAULT_DATABASE_URL
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://"):]
+    if url.startswith("postgresql://"):
+        try:
+            import psycopg  # noqa: F401
+        except ImportError:
+            try:
+                import psycopg2  # noqa: F401
+                url = "postgresql+psycopg2://" + url[len("postgresql://"):]
+            except ImportError:
+                pass
+    return url
 
 
 def run_migrations_offline() -> None:

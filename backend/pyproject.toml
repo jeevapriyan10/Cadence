@@ -20,6 +20,8 @@ dependencies = [
     "ortools",
     "networkx",
     "gymnasium",
+    "psycopg2-binary",
+    "psycopg[binary]",
 ]
 
 [project.optional-dependencies]

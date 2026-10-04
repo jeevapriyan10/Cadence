@@ -10,17 +10,48 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from cadence.domain.models import Base
 
-DEFAULT_DATABASE_URL = "sqlite:///cadence.db"
-DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
+DEFAULT_DATABASE_URL = "sqlite:///./cadence.db"
+
+
+def get_database_url() -> str:
+    """Retrieve the database URL from DATABASE_URL env var, defaulting to SQLite."""
+    return os.getenv("DATABASE_URL") or DEFAULT_DATABASE_URL
+
+
+DATABASE_URL = get_database_url()
 
 
 def get_engine(url: Optional[str] = None) -> Engine:
-    """Create a SQLAlchemy engine configured for the given or default URL."""
-    db_url = url or DATABASE_URL
+    """Create a SQLAlchemy engine configured for the given or default URL.
+
+    When DATABASE_URL points to Postgres, normalizes the dialect and configures
+    connection arguments appropriately. When pointing to SQLite, configures
+    check_same_thread=False.
+    """
+    db_url = url or os.getenv("DATABASE_URL") or DEFAULT_DATABASE_URL
+    if db_url.startswith("postgres://"):
+        db_url = "postgresql://" + db_url[len("postgres://"):]
+
+    # If generic postgresql:// is specified, prefer psycopg if present, else fallback to psycopg2
+    if db_url.startswith("postgresql://"):
+        try:
+            import psycopg  # noqa: F401
+        except ImportError:
+            try:
+                import psycopg2  # noqa: F401
+                db_url = "postgresql+psycopg2://" + db_url[len("postgresql://"):]
+            except ImportError:
+                pass
+
     connect_args = {}
+    engine_kwargs = {}
+
     if db_url.startswith("sqlite"):
         connect_args["check_same_thread"] = False
-    return create_engine(db_url, connect_args=connect_args)
+    elif db_url.startswith("postgresql"):
+        engine_kwargs["pool_pre_ping"] = True
+
+    return create_engine(db_url, connect_args=connect_args, **engine_kwargs)
 
 
 engine = get_engine()
