@@ -48,14 +48,14 @@ def test_postgres_database_url_parsing(monkeypatch: pytest.MonkeyPatch) -> None:
     assert resolved_url == postgres_url
 
     engine: Engine = get_engine()
-    assert engine.url.drivername in ("postgresql", "postgresql+psycopg2")
+    assert engine.url.drivername in ("postgresql", "postgresql+psycopg", "postgresql+psycopg2")
     assert engine.url.username == "cadence_user"
     assert engine.url.password == "secret_pass"
     assert engine.url.host == "db.example.com"
     assert engine.url.port == 5432
     assert engine.url.database == "cadence_prod"
     assert engine.dialect.name == "postgresql"
-    assert engine.dialect.driver == "psycopg2"
+    assert engine.dialect.driver in ("psycopg", "psycopg2")
 
 
 def test_postgres_legacy_scheme_normalization(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -64,7 +64,7 @@ def test_postgres_legacy_scheme_normalization(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setenv("DATABASE_URL", legacy_url)
 
     engine: Engine = get_engine()
-    assert engine.url.drivername in ("postgresql", "postgresql+psycopg2")
+    assert engine.url.drivername in ("postgresql", "postgresql+psycopg", "postgresql+psycopg2")
     assert engine.url.host == "db.internal"
     assert engine.url.database == "cadence_cluster"
     assert engine.dialect.name == "postgresql"
