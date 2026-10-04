@@ -94,11 +94,11 @@ jobs:
 
       - name: Build Docker containers
         run: |
-          docker-compose build
+          docker compose build
 
       - name: Start services
         run: |
-          docker-compose up -d
+          docker compose up -d
 
       - name: Wait for backend health check
         run: |
@@ -109,7 +109,7 @@ jobs:
             elapsed=$(( $(date +%s) - start_time ))
             if [ $elapsed -ge $timeout ]; then
               echo "Healthcheck timed out after ${timeout} seconds."
-              docker-compose logs
+              docker compose logs
               exit 1
             fi
             sleep 2
@@ -124,11 +124,11 @@ jobs:
           echo ""
           if [ "$http_code" -ne 200 ]; then
             echo "Expected HTTP 200 from /health, got $http_code"
-            docker-compose logs
+            docker compose logs
             exit 1
           fi
 
       - name: Cleanup Docker containers
         if: always()
         run: |
-          docker-compose down -v
+          docker compose down -v
