@@ -12,5 +12,6 @@ gymnasium
 stable-baselines3
 psycopg2-binary
 psycopg[binary]
+ruff
 
 
