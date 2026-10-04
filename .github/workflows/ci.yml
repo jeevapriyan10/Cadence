@@ -10,6 +10,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   backend:
     name: Backend CI (Python 3.11)
